@@ -1,0 +1,40 @@
+{
+  "name": "miLight-adapter",
+  "display_name": "miLight",
+  "version": "0.4.0",
+  "description": "miLight adapter add-on for Mozilla IoT Gateway",
+  "author": "Mozilla IoT",
+  "main": "index.js",
+  "keywords": [
+    "mozilla",
+    "iot",
+    "adapter",
+    "miLight"
+  ],
+  "homepage": "",
+  "license": "MPL-2.0",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "bugs": {
+    "url": ""
+  },
+  "devDependencies": {
+    "eslint": "^4.19.1"
+  },
+  "files": [
+    "LICENSE",
+    "SHA256SUMS",
+    "miLight-adapter.js",
+    "index.js"
+  ],
+  "moziot": {
+    "api": {
+      "min": 1,
+      "max": 2
+    },
+    "plugin": true,
+    "exec": "{nodeLoader} {path}"
+  }
+}
