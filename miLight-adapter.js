@@ -256,13 +256,20 @@ class miLightAdapter extends Adapter {
   
   sendProperties(deviceId, properties) {
     const uri = `http://${this.bridgeIp}`;
-
+    const port = 80;
+    const dgram = require('dgram');
+    const message = [ , 0x55];
+    const client = dgram.createSocket('udp4');
+    
     // Skip the next update after a sendProperty
     if (this.devices[deviceId]) {
       this.devices[deviceId].recentlyUpdated = true;
     }
+    client.send(message, port, uri, (err) => {
+      client.close();
+    });
 
-    return fetch(uri, {
+   /* return fetch(uri, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -272,7 +279,7 @@ class miLightAdapter extends Adapter {
       return res.text();
     }).catch((e) => {
       console.error(e);
-    });
+    });*/
   }
 }
 
