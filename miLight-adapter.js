@@ -23,8 +23,97 @@ try {
   Property = gwa.Property;
 }
 
-function stateToLevel(state) {
-  return Math.round(state.bri / 254 * 100);
+function levelToCmd(level) {
+  if (level == 0) {
+    return {
+      code : 0x41;
+      param : 0x00;
+    };
+  }
+  else if (level == 100) {
+    return {
+      code : 0x42;
+      param : 0x00;
+    };
+  }
+  else {
+    return {
+      code : 0x4E;
+      param : Math.round(level / 4);
+    };
+  }
+}
+
+function cssToCmd(cssColor) {
+  const color = Color(cssColor);
+  switch(color.rgbNumber()) {
+  case 0x000000: {//Black
+    return null;
+  }
+  case 0x000080: {//Navy
+    return {
+      code : 0x40;
+      param : 0x00;
+    };
+  }
+  case 0x0000FF: {//Blue
+    return {
+      code : 0x40;
+      param : 0xBA;
+    };
+  }
+  case 0x008000: {//Green
+    return {
+      code : 0x40;
+      param : 0x7A;
+    };
+  }
+  case 0x00FF00: {//Lime
+    return {
+      code : 0x40;
+      param : 0x54;
+    };
+  }
+  case 0x00FFFF: {//Aqua
+    return {
+      code : 0x40;
+      param : 0x85;
+    };
+  }
+  case 0x800080: {//Purple
+    return {
+      code : 0x40;
+      param : 0xD9;
+    };
+  }
+  case 0xFF0000: {//Red
+    return {
+      code : 0x40;
+      param : 0xFF;
+    };
+  }
+  case 0xFFA500: {//Orange
+    return {
+      code : 0x40;
+      param : 0x1E;
+    };
+  }
+  case 0xFFFF00: {//Yellow
+    return {
+      code : 0x40;
+      param : 0x3B;
+    };
+  }
+  case 0xFFFFFF: {//White
+    return {
+      code : 0xC2;
+      param : 0x00;
+    };
+  }
+  default: {
+    return null;
+  }
+  }
 }
 
 function on() {
@@ -78,6 +167,12 @@ const dimmableColorLight = {
   events: [],
 };
 
+const whiteCodes = [0xC2, 0xC5, 0xC7, 0xC9, 0xCB];
+const onCodes = [0x42, 0x45, 0x47, 0x49, 0x4B];
+const offCodes = [0x41, 0x46, 0x48, 0x4A, 0x4C];
+/*const brightCodes = [0x00, 0x02, 0x03, 0x04, 0x05, 0x08, 0x09, 0x0A, 0x0B, 0x0D,
+                     0x0E, 0x0F, 0x10, 0x12, 0x13, 0x14, 0x15, 0x17, 0x18, 0x19];*/
+
 class miLightProperty extends Property {
   constructor(device, name, propertyDescription) {
     super(device, name, propertyDescription);
@@ -126,38 +221,30 @@ class miLightDevice extends Device {
 
   notifyPropertyChanged(property) {
     super.notifyPropertyChanged(property);
-    let properties = null;
+    let cmd = null;
     switch (property.name) {
       case 'color': {
-        properties = cssToState(this.properties.get('color').value);
+        cmd =  Object.assign(cmd, cssToCmd(this.properties.get('color').value));
         break;
       }
       case 'on': {
-        properties = {};
-        // We might be turning on after changing the color/level
-        if (this.properties.has('color')) {
-          properties = Object.assign(properties,
-                                     cssToState(this.properties.get('color').value));
-        }
-        if (this.properties.has('level')) {
-          properties = Object.assign(properties,
-                                     levelToState(this.properties.get('level').value));
-        }
-        properties.on = this.properties.get('on').value;
+        //if (this.properties.has('level'))
+        cmd.param = 0x00;
+        cmd.code = (this.properties.get('on').value == false) ? 0x41 : 0x42;
         break;
       }
       case 'level': {
-        properties = levelToState(this.properties.get('level').value);
+        cmd =  Object.assign(cmd, levelToCmd(this.properties.get('level').value));
         break;
       }
       default:
         console.warn('Unknown property:', property.name);
         return;
     }
-    if (!properties) {
+    if (!cmd) {
       return;
     }
-    this.adapter.sendProperties(this.deviceId, properties);
+    this.adapter.sendProperties(this.deviceId, cmd);
   }
 }
 
@@ -254,11 +341,11 @@ class miLightAdapter extends Adapter {
                 'cancelRemoveThing(', device.id, ')');
   }
   
-  sendProperties(deviceId, properties) {
+  sendProperties(deviceId, cmd) {
     const uri = `http://${this.bridgeIp}`;
     const port = 80;
     const dgram = require('dgram');
-    const message = [ , 0x55];
+    const message = [cmd.code, cmd.param, 0x55];
     const client = dgram.createSocket('udp4');
     
     // Skip the next update after a sendProperty
@@ -268,18 +355,6 @@ class miLightAdapter extends Adapter {
     client.send(message, port, uri, (err) => {
       client.close();
     });
-
-   /* return fetch(uri, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(properties),
-    }).then((res) => {
-      return res.text();
-    }).catch((e) => {
-      console.error(e);
-    });*/
   }
 }
 
