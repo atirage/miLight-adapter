@@ -26,20 +26,20 @@ try {
 function levelToCmd(level) {
   if (level == 0) {
     return {
-      code : 0x41;
-      param : 0x00;
+      code : 0x41,
+      param : 0x00,
     };
   }
   else if (level == 100) {
     return {
-      code : 0x42;
-      param : 0x00;
+      code : 0x42,
+      param : 0x00,
     };
   }
   else {
     return {
-      code : 0x4E;
-      param : Math.round(level / 4);
+      code : 0x4E,
+      param : Math.round(level / 4),
     };
   }
 }
@@ -52,62 +52,62 @@ function cssToCmd(cssColor) {
   }
   case 0x000080: {//Navy
     return {
-      code : 0x40;
-      param : 0x00;
+      code : 0x40,
+      param : 0x00,
     };
   }
   case 0x0000FF: {//Blue
     return {
-      code : 0x40;
-      param : 0xBA;
+      code : 0x40,
+      param : 0xBA,
     };
   }
   case 0x008000: {//Green
     return {
-      code : 0x40;
-      param : 0x7A;
+      code : 0x40,
+      param : 0x7A,
     };
   }
   case 0x00FF00: {//Lime
     return {
-      code : 0x40;
-      param : 0x54;
+      code : 0x40,
+      param : 0x54,
     };
   }
   case 0x00FFFF: {//Aqua
     return {
-      code : 0x40;
-      param : 0x85;
+      code : 0x40,
+      param : 0x85,
     };
   }
   case 0x800080: {//Purple
     return {
-      code : 0x40;
-      param : 0xD9;
+      code : 0x40,
+      param : 0xD9,
     };
   }
   case 0xFF0000: {//Red
     return {
-      code : 0x40;
-      param : 0xFF;
+      code : 0x40,
+      param : 0xFF,
     };
   }
   case 0xFFA500: {//Orange
     return {
-      code : 0x40;
-      param : 0x1E;
+      code : 0x40,
+      param : 0x1E,
     };
   }
   case 0xFFFF00: {//Yellow
     return {
-      code : 0x40;
-      param : 0x3B;
+      code : 0x40,
+      param : 0x3B,
     };
   }
   case 0xFFFFFF: {//White
     return {
-      code : 0xC2;
-      param : 0x00;
+      code : 0xC2,
+      param : 0x00,
     };
   }
   default: {
@@ -174,10 +174,10 @@ const offCodes = [0x41, 0x46, 0x48, 0x4A, 0x4C];
                      0x0E, 0x0F, 0x10, 0x12, 0x13, 0x14, 0x15, 0x17, 0x18, 0x19];*/
 
 class miLightProperty extends Property {
-  constructor(device, name, propertyDescription) {
-    super(device, name, propertyDescription);
-    this.setCachedValue(propertyDescription.value);
-    this.device.notifyPropertyChanged(this);
+  constructor(device, name, descr, value) {
+    super(device, name, descr);
+    this.setCachedValue(value);
+    //this.device.notifyPropertyChanged(this);
   }
 
   /**
@@ -190,38 +190,34 @@ class miLightProperty extends Property {
    * the value passed in.
    */
   setValue(value) {
-  const changed = this.value !== value;
-  return new Promise((resolve, reject) => {
-    super.setValue(value).then((updatedValue) => {
-      resolve(updatedValue);
+    const changed = this.value !== value; 
+    return new Promise((resolve) => {
+      this.setCachedValue(value);
+      resolve(this.value);
       if (changed) {
         this.device.notifyPropertyChanged(this);
       }
-    }).catch((err) => {
-      reject(err);
-      });
     });
   }
 }
 
 class miLightDevice extends Device {
-  constructor(adapter, id, deviceDescription) {
+  constructor(adapter, id, template) {
     super(adapter, id);
-    this.name = deviceDescription.name;
-    this.type = deviceDescription.type;
-    this['@type'] = deviceDescription['@type'];
-    this.description = deviceDescription.description;
-    for (const propertyName in deviceDescription.properties) {
-      const propertyDescription = deviceDescription.properties[propertyName];
-      const property = new miLightProperty(this, propertyName,
-                                           propertyDescription);
-      this.properties.set(propertyName, property);
+    this.name = template.name;
+    this.type = template.type;
+    this['@context'] = template['@context'];
+    this['@type'] = template['@type'];
+    for (const prop of template.properties) {
+      this.properties.set(prop.name, 
+                          new miLightProperty(this, prop.name, prop.metadata, prop.value));
     }
   }
 
   notifyPropertyChanged(property) {
     super.notifyPropertyChanged(property);
     let cmd = null;
+    console.log('miLightAdapter:', property);
     switch (property.name) {
       case 'color': {
         cmd =  Object.assign(cmd, cssToCmd(this.properties.get('color').value));
@@ -231,15 +227,16 @@ class miLightDevice extends Device {
         //if (this.properties.has('level'))
         cmd.param = 0x00;
         cmd.code = (this.properties.get('on').value == false) ? 0x41 : 0x42;
+        console.log('miLightAdapter:', 'setting cmd', cmd);
         break;
       }
       case 'level': {
-        cmd =  Object.assign(cmd, levelToCmd(this.properties.get('level').value));
+        cmd =  Object. assign(cmd, levelToCmd(this.properties.get('level').value));
         break;
       }
       default:
         console.warn('Unknown property:', property.name);
-        return;
+        break;
     }
     if (!cmd) {
       return;
@@ -249,10 +246,11 @@ class miLightDevice extends Device {
 }
 
 class miLightAdapter extends Adapter {
-  constructor(addonManager, packageName) {
+  constructor(adapterManager, manifestName) {
+    super(adapterManager, 'miLightAdapter', manifestName);
     this.bridgeIp = '192.168.0.66';
-    super(addonManager, 'miLightAdapter', packageName);
-    addonManager.addAdapter(this);
+    adapterManager.addAdapter(this);
+    this.addDevice('miLight-adapter-0', dimmableColorLight);
   }
 
   /**
@@ -304,6 +302,7 @@ class miLightAdapter extends Adapter {
   startPairing(_timeoutSeconds) {
     console.log('miLightAdapter:', this.name,
                 'id', this.id, 'pairing started');
+    //this.addDevice('miLight-adapter', dimmableColorLight);
   }
 
   /**
@@ -352,6 +351,7 @@ class miLightAdapter extends Adapter {
     if (this.devices[deviceId]) {
       this.devices[deviceId].recentlyUpdated = true;
     }
+    console.log('miLightAdapter:', uri, port, message)
     client.send(message, port, uri, (err) => {
       client.close();
     });
@@ -359,9 +359,7 @@ class miLightAdapter extends Adapter {
 }
 
 function loadmiLightAdapter(addonManager, manifest, _errorCallback) {
-  const adapter = new miLightAdapter(addonManager, manifest.name);
-  const device = new miLightDevice(adapter, 'miLight Bulbs', dimmableColorLight);
-  adapter.handleDeviceAdded(device);
+  new miLightAdapter(addonManager, manifest.name);
 }
 
 module.exports = loadmiLightAdapter;
