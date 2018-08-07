@@ -217,23 +217,19 @@ class miLightDevice extends Device {
   notifyPropertyChanged(property) {
     super.notifyPropertyChanged(property);
     let cmd = null;
-    console.log('miLightAdapter:', property);
     switch (property.name) {
-      case 'color': {
+      case 'color':
         cmd =  Object.assign(cmd, cssToCmd(this.properties.get('color').value));
         break;
-      }
-      case 'on': {
+      case 'on':
         //if (this.properties.has('level'))
-        cmd.param = 0x00;
-        cmd.code = (this.properties.get('on').value == false) ? 0x41 : 0x42;
-        console.log('miLightAdapter:', 'setting cmd', cmd);
+        cmd =  Object.assign(cmd, { code : (this.properties.get('on').value == false) ? 0x41 : 0x42,
+                                    param : 0x00,
+                                  });
         break;
-      }
-      case 'level': {
+      case 'level':
         cmd =  Object. assign(cmd, levelToCmd(this.properties.get('level').value));
         break;
-      }
       default:
         console.warn('Unknown property:', property.name);
         break;
