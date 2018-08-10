@@ -37,6 +37,15 @@
       "max": 2
     },
     "plugin": true,
-    "exec": "{nodeLoader} {path}"
+    "exec": "{nodeLoader} {path}",
+    "config": {
+        "bulb": [
+           {
+             "bridgeIP": "192.168.0.66",
+             "bridgePort": "80",
+             "zone": 0
+           }
+         ]
+    }
   }
 }
