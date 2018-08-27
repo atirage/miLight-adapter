@@ -23,16 +23,16 @@ try {
   Property = gwa.Property;
 }
 
-function levelToCmd(level) {
+function levelToCmd(level, zone) {
   if (level == 0) {
     return {
-      code : 0x41,
+      code : offCodes[zone],
       param : 0x00,
     };
   }
   else if (level == 100) {
     return {
-      code : 0x42,
+      code : onCodes[zone],
       param : 0x00,
     };
   }
@@ -44,7 +44,7 @@ function levelToCmd(level) {
   }
 }
 
-function cssToCmd(cssColor) {
+function cssToCmd(cssColor, zone) {
   const color = Color(cssColor);
   switch(color.rgbNumber()) {
   case 0x000000: {//Black
@@ -106,7 +106,7 @@ function cssToCmd(cssColor) {
   }
   case 0xFFFFFF: {//White
     return {
-      code : 0xC2,
+      code : whiteCodes[zone],
       param : 0x00,
     };
   }
@@ -170,8 +170,6 @@ const dimmableColorLight = {
 const whiteCodes = [0xC2, 0xC5, 0xC7, 0xC9, 0xCB];
 const onCodes = [0x42, 0x45, 0x47, 0x49, 0x4B];
 const offCodes = [0x41, 0x46, 0x48, 0x4A, 0x4C];
-/*const brightCodes = [0x00, 0x02, 0x03, 0x04, 0x05, 0x08, 0x09, 0x0A, 0x0B, 0x0D,
-                     0x0E, 0x0F, 0x10, 0x12, 0x13, 0x14, 0x15, 0x17, 0x18, 0x19];*/
 
 class miLightProperty extends Property {
   constructor(device, name, descr, value) {
@@ -202,10 +200,11 @@ class miLightProperty extends Property {
 }
 
 class miLightDevice extends Device {
-  constructor(adapter, id, template) {
+  constructor(adapter, id, template, config) {
     super(adapter, id);
     this.name = template.name;
     this.type = template.type;
+    this.config = config;
     this['@context'] = template['@context'];
     this['@type'] = template['@type'];
     for (const prop of template.properties) {
@@ -217,9 +216,10 @@ class miLightDevice extends Device {
   notifyPropertyChanged(property) {
     super.notifyPropertyChanged(property);
     let cmd = null;
+    let zone = this.adapter.devices[this.deviceId].config.zone;
     switch (property.name) {
       case 'color':
-        cmd =  Object.assign(cmd, cssToCmd(this.properties.get('color').value));
+        cmd =  Object.assign(cmd, cssToCmd(this.properties.get('color').value, zone));
         break;
       case 'on':
         //if (this.properties.has('level'))
@@ -228,7 +228,7 @@ class miLightDevice extends Device {
                                   });
         break;
       case 'level':
-        cmd =  Object. assign(cmd, levelToCmd(this.properties.get('level').value));
+        cmd =  Object. assign(cmd, levelToCmd(this.properties.get('level').value, zone));
         break;
       default:
         console.warn('Unknown property:', property.name);
@@ -242,11 +242,12 @@ class miLightDevice extends Device {
 }
 
 class miLightAdapter extends Adapter {
-  constructor(adapterManager, manifestName) {
-    super(adapterManager, 'miLightAdapter', manifestName);
-    this.bridgeIp = '192.168.0.66';
+  constructor(adapterManager, manifest) {
+    super(adapterManager, 'miLightAdapter', manifest.name);
     adapterManager.addAdapter(this);
-    this.addDevice('miLight-adapter-0', dimmableColorLight);
+    for (i = 0; i < manifest.moziot.config.bulbs.length; i++) {
+      this.addDevice('miLight-adapter-${i}', dimmableColorLight, manifest.moziot.config.bulbs[i]);
+    }
   }
 
   /**
@@ -258,12 +259,12 @@ class miLightAdapter extends Adapter {
    * @param {String} deviceDescription Description of the device to add.
    * @return {Promise} which resolves to the device added.
    */
-  addDevice(deviceId, deviceDescription) {
+  addDevice(deviceId, deviceDescription, deviceConfig) {
     return new Promise((resolve, reject) => {
       if (deviceId in this.devices) {
         reject(`Device: ${deviceId} already exists.`);
       } else {
-        const device = new miLightDevice(this, deviceId, deviceDescription);
+        const device = new miLightDevice(this, deviceId, deviceDescription, deviceConfig);
         this.handleDeviceAdded(device);
         resolve(device);
       }
@@ -337,8 +338,6 @@ class miLightAdapter extends Adapter {
   }
   
   sendProperties(deviceId, cmd) {
-    const uri = `http://${this.bridgeIp}`;
-    const port = 80;
     const dgram = require('dgram');
     const message = [cmd.code, cmd.param, 0x55];
     const client = dgram.createSocket('udp4');
@@ -348,18 +347,42 @@ class miLightAdapter extends Adapter {
       this.devices[deviceId].recentlyUpdated = true;
     }
     console.log('miLightAdapter:', uri, port, message)
-    client.send(message, port, uri, (err) => {
+    client.send(message, this.devices[deviceId].config.port, this.devices[deviceId].config., (err) => {
       client.close();
     });
   }
 }
 
 function loadmiLightAdapter(addonManager, manifest, _errorCallback) {
-  new miLightAdapter(addonManager, manifest.name);
+  let promise;
+  if (Database) {
+    const db = new Database(manifest.name);
+    promise = db.open().then(() => {
+      return db.loadConfig();
+    }).then((config) => {
+      let bulbsCfg = Object.assign(bulbsCfg, config.bulbs); 
+      const bulbList = [];
+      for (const elem in bulbsCfg) {
+        const bulb = Object.assign({}, bulbsCfg[elem]);
+        /*bulb.port = parseInt(, 10);
+        bulb.zone =*/ 
+        bulbList.push(bulb);
+      }
+      if (bulbList.length > 0) {
+        manifest.moziot.config.bulbs = bulbList;
+        return db.saveConfig({bulbList});
+      }
+    });
+  }
+  else {
+    promise = Promise.resolve();
+  }
+    
+  promise.then(() => new miLightAdapter(addonManager, manifest));
 }
 
 //function loadGpioAdapter(addonManager, manifest, _errorCallback) {
-//  let promise;
+//  
 //
 //  // Attempt to move to new config format
 //  if (Database) {

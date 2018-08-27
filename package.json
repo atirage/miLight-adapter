@@ -39,10 +39,10 @@
     "plugin": true,
     "exec": "{nodeLoader} {path}",
     "config": {
-        "bulb": [
+        "bulbs": [
            {
              "bridgeIP": "192.168.0.66",
-             "bridgePort": "80",
+             "bridgePort": 80,
              "zone": 0
            }
          ]
