@@ -1,51 +1,41 @@
 {
-  "name": "miLight-adapter",
-  "display_name": "miLight",
-  "version": "0.0.1",
-  "description": "miLight adapter add-on for Mozilla IoT Gateway",
-  "main": "index.js",
-  "keywords": [
-    "mozilla",
-    "iot",
-    "adapter",
-    "miLight"
-  ],
-  "homepage": "",
-  "author": "atirage",
-  "license": "MPL-2.0",
-  "repository": {
-    "type": "git",
-    "url": ""
-  },
-  "bugs": {
-    "url": ""
-  },
-  "dependencies": {
-  },
-  "devDependencies": {
-    "eslint": "^4.19.1"
-  },
-  "files": [
-    "LICENSE",
-    "SHA256SUMS",
-    "index.js",
-    "miLight-adapter.js"
-  ],
-  "moziot": {
-    "api": {
-      "min": 1,
-      "max": 2
-    },
-    "plugin": true,
-    "exec": "{nodeLoader} {path}",
-    "config": {
-        "bulbs": [
-           {
-             "bridgeIP": "192.168.0.66",
-             "bridgePort": 80,
-             "zone": 0
-           }
-         ]
+ "name":"miLight-adapter",
+ "display_name":"miLight",
+ "version":"0.0.2",
+ "description":"miLight adapter add-on for Mozilla IoT Gateway",
+ "main":"index.js",
+ "keywords":["mozilla","iot","adapter","miLight"],
+ "homepage":"",
+ "author":"atirage",
+ "license":"MPL-2.0",
+ "repository":{"type":"git","url":""},
+ "bugs":{"url":""},
+ "dependencies":{},
+ "devDependencies":{"eslint":"^4.19.1"},
+ "files":["LICENSE","SHA256SUMS","index.js","miLight-adapter.js"],
+ "moziot":{
+    "api":{"min":1,"max":2},
+    "plugin":true,
+    "exec":"{nodeLoader} {path}",
+    "config":{"bulbs":[
+              {"bridgeIP":"192.168.0.66",
+               "bridgePort":8899,
+               "zone":0}
+            ]},
+    "schema":{
+            "type":"object",
+            "properties":
+             {"bulbs":
+               {"type":"array",
+                "items":{"type":"object",
+                         "required":["bridgeIP"],
+                         "properties":{"bridgeIP":{"type":"string"},
+                                       "bridgePort":{"type":"integer","minimum":1},
+                                       "zone":{"type":"integer","minimum":0}
+                                      }
+                        }
+               }
+            }
+        }
     }
-  }
 }

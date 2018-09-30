@@ -8,7 +8,7 @@
 
 'use strict';
 
-let Adapter, Device, Property;
+let Adapter, Device, Property, Database;
 try {
   Adapter = require('../adapter');
   Device = require('../device');
@@ -19,6 +19,7 @@ try {
   }
   const gwa = require('gateway-addon');
   Adapter = gwa.Adapter;
+  Database = gwa.Database;
   Device = gwa.Device;
   Property = gwa.Property;
 }
@@ -45,6 +46,7 @@ function levelToCmd(level, zone) {
 }
 
 function cssToCmd(cssColor, zone) {
+  var Color = require('color');
   const color = Color(cssColor);
   switch(color.rgbNumber()) {
   case 0x000000: {//Black
@@ -188,13 +190,13 @@ class miLightProperty extends Property {
    * the value passed in.
    */
   setValue(value) {
-    const changed = this.value !== value; 
     return new Promise((resolve) => {
+      const changed = (this.value !== value); 
       this.setCachedValue(value);
-      resolve(this.value);
       if (changed) {
         this.device.notifyPropertyChanged(this);
       }
+      resolve(this.value);
     });
   }
 }
@@ -215,20 +217,20 @@ class miLightDevice extends Device {
 
   notifyPropertyChanged(property) {
     super.notifyPropertyChanged(property);
-    let cmd = null;
-    let zone = this.adapter.devices[this.deviceId].config.zone;
+    let cmd = {};
+    let zone = this.config.zone;
     switch (property.name) {
       case 'color':
-        cmd =  Object.assign(cmd, cssToCmd(this.properties.get('color').value, zone));
+        cmd = Object.assign(cmd, cssToCmd(this.properties.get('color').value, zone));
         break;
       case 'on':
         //if (this.properties.has('level'))
-        cmd =  Object.assign(cmd, { code : (this.properties.get('on').value == false) ? 0x41 : 0x42,
+        cmd = Object.assign(cmd, { code : (this.properties.get('on').value == false) ? 0x41 : 0x42,
                                     param : 0x00,
                                   });
         break;
       case 'level':
-        cmd =  Object. assign(cmd, levelToCmd(this.properties.get('level').value, zone));
+        cmd = Object.assign(cmd, levelToCmd(this.properties.get('level').value, zone));
         break;
       default:
         console.warn('Unknown property:', property.name);
@@ -237,7 +239,7 @@ class miLightDevice extends Device {
     if (!cmd) {
       return;
     }
-    this.adapter.sendProperties(this.deviceId, cmd);
+    this.adapter.sendProperties(this.id, cmd);
   }
 }
 
@@ -245,8 +247,9 @@ class miLightAdapter extends Adapter {
   constructor(adapterManager, manifest) {
     super(adapterManager, 'miLightAdapter', manifest.name);
     adapterManager.addAdapter(this);
-    for (i = 0; i < manifest.moziot.config.bulbs.length; i++) {
-      this.addDevice('miLight-adapter-${i}', dimmableColorLight, manifest.moziot.config.bulbs[i]);
+    var i = 0;
+    for (; i < manifest.moziot.config.bulbs.length; i++) {
+      this.addDevice('miLight-adapter-' + i.toString(), dimmableColorLight, manifest.moziot.config.bulbs[i]);
     }
   }
 
@@ -339,15 +342,14 @@ class miLightAdapter extends Adapter {
   
   sendProperties(deviceId, cmd) {
     const dgram = require('dgram');
-    const message = [cmd.code, cmd.param, 0x55];
+    const message = Buffer.from([cmd.code, cmd.param, 0x55]);
     const client = dgram.createSocket('udp4');
     
     // Skip the next update after a sendProperty
     if (this.devices[deviceId]) {
       this.devices[deviceId].recentlyUpdated = true;
     }
-    console.log('miLightAdapter:', uri, port, message)
-    client.send(message, this.devices[deviceId].config.port, this.devices[deviceId].config., (err) => {
+    client.send(message, this.devices[deviceId].config.bridgePort, this.devices[deviceId].config.bridgeIP, (err) => {
       client.close();
     });
   }
@@ -360,16 +362,15 @@ function loadmiLightAdapter(addonManager, manifest, _errorCallback) {
     promise = db.open().then(() => {
       return db.loadConfig();
     }).then((config) => {
-      let bulbsCfg = Object.assign(bulbsCfg, config.bulbs); 
+      let bulbsCfg = Object.assign({}, config.bulbs); 
       const bulbList = [];
       for (const elem in bulbsCfg) {
         const bulb = Object.assign({}, bulbsCfg[elem]);
-        /*bulb.port = parseInt(, 10);
-        bulb.zone =*/ 
         bulbList.push(bulb);
       }
       if (bulbList.length > 0) {
         manifest.moziot.config.bulbs = bulbList;
+        //console.log('miLightAdapter:', 'Saving config');
         return db.saveConfig({bulbList});
       }
     });
@@ -377,49 +378,10 @@ function loadmiLightAdapter(addonManager, manifest, _errorCallback) {
   else {
     promise = Promise.resolve();
   }
-    
-  promise.then(() => new miLightAdapter(addonManager, manifest));
+  promise.then(() => {
+                      console.log('miLightAdapter:', manifest.moziot.config.bulbs);
+                      new miLightAdapter(addonManager, manifest)
+                     });
 }
-
-//function loadGpioAdapter(addonManager, manifest, _errorCallback) {
-//  
-//
-//  // Attempt to move to new config format
-//  if (Database) {
-//    const db = new Database(manifest.name);
-//    promise = db.open().then(() => {
-//      return db.loadConfig();
-//    }).then((config) => {
-//      let oldGpios = {};
-//
-//      // The 'gpios' config item used to be 'pins'. Retain compatibility.
-//      if (config.hasOwnProperty('pins')) {
-//        oldGpios = Object.assign(oldGpios, config.pins);
-//        delete config.pins;
-//      }
-//
-//      if (config.hasOwnProperty('gpios') && !Array.isArray(config.gpios)) {
-//        // this handles the old object-based config
-//        oldGpios = Object.assign(oldGpios, config.gpios);
-//      }
-//
-//      const gpios = [];
-//
-//      for (const gpioPin in oldGpios) {
-//        const gpio = Object.assign({}, oldGpios[gpioPin]);
-//        gpio.pin = parseInt(gpioPin, 10);
-//        gpios.push(gpio);
-//      }
-//      if (gpios.length > 0) {
-//        manifest.moziot.config.gpios = gpios;
-//        return db.saveConfig({gpios});
-//      }
-//    });
-//  } else {
-//    promise = Promise.resolve();
-//  }
-//
-//  promise.then(() => new GpioAdapter(addonManager, manifest));
-//}
 
 module.exports = loadmiLightAdapter;
