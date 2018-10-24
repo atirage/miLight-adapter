@@ -25,23 +25,14 @@ try {
 }
 
 function levelToCmd(level, zone) {
-  if (level == 0) {
-    return {
-      code : offCodes[zone],
-      param : 0x00,
-    };
-  }
-  else if (level == 100) {
-    return {
-      code : onCodes[zone],
-      param : 0x00,
-    };
-  }
-  else {
+  if (level > 0) {
     return {
       code : 0x4E,
       param : Math.round(level / 4),
     };
+  }
+  else {
+    return {};
   }
 }
 
@@ -155,6 +146,13 @@ function brightness() {
   };
 }
 
+function sleep(ms){
+  return new Promise(resolve => {
+      setTimeout(resolve,ms)
+  })
+}
+
+
 const dimmableColorLight = {
   type: 'dimmableColorLight',
   '@context': 'https://iot.mozilla.org/schemas',
@@ -194,7 +192,12 @@ class miLightProperty extends Property {
       const changed = (this.value !== value); 
       this.setCachedValue(value);
       if (changed) {
-        this.device.notifyPropertyChanged(this);
+        if(this.name == 'on') {
+          this.device.notifyStateChanged(this);
+        }
+        else {
+          this.device.notifyPropertyChanged(this);
+        }
       }
       resolve(this.value);
     });
@@ -215,6 +218,16 @@ class miLightDevice extends Device {
     }
   }
 
+  notifyStateChanged(property) {
+    super.notifyPropertyChanged(property);
+    if('on' == property.name) {
+       this.adapter.sendProperties(this.id, 
+                                   { code : (property.value == false) ? offCodes[this.config.zone] : onCodes[this.config.zone],
+                                     param : 0x00,
+       });
+    }
+  }  
+  
   notifyPropertyChanged(property) {
     super.notifyPropertyChanged(property);
     let cmd = {};
@@ -222,24 +235,27 @@ class miLightDevice extends Device {
     switch (property.name) {
       case 'color':
         cmd = Object.assign(cmd, cssToCmd(this.properties.get('color').value, zone));
-        break;
-      case 'on':
-        //if (this.properties.has('level'))
-        cmd = Object.assign(cmd, { code : (this.properties.get('on').value == false) ? 0x41 : 0x42,
-                                    param : 0x00,
-                                  });
+        this.adapter.sendProperties(this.id, cmd);
         break;
       case 'level':
-        cmd = Object.assign(cmd, levelToCmd(this.properties.get('level').value, zone));
+        if (0 == property.value) {
+            this.properties.get('on').setValue(false);
+        }
+        else {
+           cmd = Object.assign(cmd, levelToCmd(this.properties.get('level').value, zone));
+           if (this.properties.get('on').value == false) {
+               this.properties.get('on').setValue(true);
+               sleep(100).then(() => { this.adapter.sendProperties(this.id, cmd) });
+           }
+           else{
+               this.adapter.sendProperties(this.id, cmd)
+           }
+        }
         break;
       default:
         console.warn('Unknown property:', property.name);
         break;
     }
-    if (!cmd) {
-      return;
-    }
-    this.adapter.sendProperties(this.id, cmd);
   }
 }
 
