@@ -114,7 +114,7 @@ function on() {
     name: 'on',
     value: false,
     metadata: {
-      label: 'On/Off',
+      title: 'On/Off',
       type: 'boolean',
       '@type': 'OnOffProperty',
     },
@@ -126,7 +126,7 @@ function color() {
     name: 'color',
     value: '#ffffff',
     metadata: {
-      label: 'Color',
+      title: 'Color',
       type: 'string',
       '@type': 'ColorProperty',
     },
@@ -138,7 +138,7 @@ function brightness() {
     name: 'level',
     value: 0,
     metadata: {
-      label: 'Brightness',
+      title: 'Brightness',
       type: 'number',
       '@type': 'BrightnessProperty',
       unit: 'percent',
@@ -189,7 +189,7 @@ class miLightProperty extends Property {
    */
   setValue(value) {
     return new Promise((resolve) => {
-      const changed = (this.value !== value); 
+      const changed = (this.value !== value);
       this.setCachedValue(value);
       if (changed) {
         if(this.name == 'on') {
@@ -213,7 +213,7 @@ class miLightDevice extends Device {
     this['@context'] = template['@context'];
     this['@type'] = template['@type'];
     for (const prop of template.properties) {
-      this.properties.set(prop.name, 
+      this.properties.set(prop.name,
                           new miLightProperty(this, prop.name, prop.metadata, prop.value));
     }
   }
@@ -221,13 +221,13 @@ class miLightDevice extends Device {
   notifyStateChanged(property) {
     super.notifyPropertyChanged(property);
     if('on' == property.name) {
-       this.adapter.sendProperties(this.id, 
+       this.adapter.sendProperties(this.id,
                                    { code : (property.value == false) ? offCodes[this.config.zone] : onCodes[this.config.zone],
                                      param : 0x00,
        });
     }
-  }  
-  
+  }
+
   notifyPropertyChanged(property) {
     super.notifyPropertyChanged(property);
     let cmd = {};
@@ -355,12 +355,12 @@ class miLightAdapter extends Adapter {
     console.log('miLightAdapter:', this.name, 'id', this.id,
                 'cancelRemoveThing(', device.id, ')');
   }
-  
+
   sendProperties(deviceId, cmd) {
     const dgram = require('dgram');
     const message = Buffer.from([cmd.code, cmd.param, 0x55]);
     const client = dgram.createSocket('udp4');
-    
+
     // Skip the next update after a sendProperty
     if (this.devices[deviceId]) {
       this.devices[deviceId].recentlyUpdated = true;
@@ -378,16 +378,16 @@ function loadmiLightAdapter(addonManager, manifest, _errorCallback) {
     promise = db.open().then(() => {
       return db.loadConfig();
     }).then((config) => {
-      let bulbsCfg = Object.assign({}, config.bulbs); 
-      const bulbList = [];
+      let bulbsCfg = Object.assign({}, config.bulbs);
+      const bulbs = [];
       for (const elem in bulbsCfg) {
         const bulb = Object.assign({}, bulbsCfg[elem]);
-        bulbList.push(bulb);
+        bulbs.push(bulb);
       }
-      if (bulbList.length > 0) {
-        manifest.moziot.config.bulbs = bulbList;
+      if (bulbs.length > 0) {
+        manifest.moziot.config.bulbs = bulbs;
         //console.log('miLightAdapter:', 'Saving config');
-        return db.saveConfig({bulbList});
+        return db.saveConfig({bulbs});
       }
     });
   }

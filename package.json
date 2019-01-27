@@ -1,7 +1,7 @@
 {
  "name":"miLight-adapter",
  "display_name":"miLight",
- "version":"0.0.3",
+ "version":"0.0.4",
  "description":"miLight adapter add-on for Mozilla IoT Gateway",
  "author":"atirage",
  "main":"index.js",
@@ -29,11 +29,11 @@
  "dependencies":{
  },
  "devDependencies":{
-   "eslint":"^4.19.1"
+   "eslint":"^5.12.0"
  },
  "moziot":{
     "api":{
-      "min":1,
+      "min":2,
       "max":2
     },
     "plugin":true,
