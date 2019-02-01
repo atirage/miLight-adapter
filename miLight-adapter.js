@@ -175,7 +175,6 @@ class miLightProperty extends Property {
   constructor(device, name, descr, value) {
     super(device, name, descr);
     this.setCachedValue(value);
-    //this.device.notifyPropertyChanged(this);
   }
 
   /**
@@ -191,15 +190,18 @@ class miLightProperty extends Property {
     return new Promise((resolve) => {
       const changed = (this.value !== value);
       this.setCachedValue(value);
+      resolve(this.value);
       if (changed) {
         if(this.name == 'on') {
           this.device.notifyStateChanged(this);
         }
         else {
-          this.device.notifyPropertyChanged(this);
+          this.device.notifyLvlColChanged(this);
         }
       }
-      resolve(this.value);
+      else {//just notify addonManager
+        this.device.notifyPropertyChanged(this);
+      }
     });
   }
 }
@@ -228,7 +230,7 @@ class miLightDevice extends Device {
     }
   }
 
-  notifyPropertyChanged(property) {
+  notifyLvlColChanged(property) {
     super.notifyPropertyChanged(property);
     let cmd = {};
     let zone = this.config.zone;
