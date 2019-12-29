@@ -38,74 +38,29 @@ function levelToCmd(level, zone) {
 
 function cssToCmd(cssColor, zone) {
   var Color = require('color');
+  var hh;
+  var hsl;
   const color = Color(cssColor);
-  switch(color.rgbNumber()) {
-  case 0x000000: {//Black
-    return null;
-  }
-  case 0x000080: {//Navy
-    return {
-      code : 0x40,
-      param : 0x00,
-    };
-  }
-  case 0x0000FF: {//Blue
-    return {
-      code : 0x40,
-      param : 0xBA,
-    };
-  }
-  case 0x008000: {//Green
-    return {
-      code : 0x40,
-      param : 0x7A,
-    };
-  }
-  case 0x00FF00: {//Lime
-    return {
-      code : 0x40,
-      param : 0x54,
-    };
-  }
-  case 0x00FFFF: {//Aqua
-    return {
-      code : 0x40,
-      param : 0x85,
-    };
-  }
-  case 0x800080: {//Purple
-    return {
-      code : 0x40,
-      param : 0xD9,
-    };
-  }
-  case 0xFF0000: {//Red
-    return {
-      code : 0x40,
-      param : 0xFF,
-    };
-  }
-  case 0xFFA500: {//Orange
-    return {
-      code : 0x40,
-      param : 0x1E,
-    };
-  }
-  case 0xFFFF00: {//Yellow
-    return {
-      code : 0x40,
-      param : 0x3B,
-    };
-  }
-  case 0xFFFFFF: {//White
+  if(color.rgbNumber() == 0xFFFFFF){
     return {
       code : whiteCodes[zone],
       param : 0x00,
     };
   }
-  default: {
-    return null;
-  }
+  else{
+    //use hue
+    hsl = color.hsl().color[0];
+    //console.warn('Hsl:', hsl);
+    if(hsl > 271){
+      hsl = 271;
+    }
+    hh = (hsl * 255) / 360;
+    hh = Math.floor(192 - hh);
+    //console.warn('Mi:', hh);
+    return {
+      code : 0x40,
+      param : hh,
+    };
   }
 }
 
@@ -191,16 +146,11 @@ class miLightProperty extends Property {
       const changed = (this.value !== value);
       this.setCachedValue(value);
       resolve(this.value);
-      if (changed) {
-        if(this.name == 'on') {
-          this.device.notifyStateChanged(this);
-        }
-        else {
-          this.device.notifyLvlColChanged(this);
-        }
+      if(this.name == 'on') {
+        this.device.notifyStateChanged(this, 1/*changed*/);
       }
-      else {//just notify addonManager
-        this.device.notifyPropertyChanged(this);
+      else {
+        this.device.notifyLvlColChanged(this);
       }
     });
   }
@@ -220,9 +170,9 @@ class miLightDevice extends Device {
     }
   }
 
-  notifyStateChanged(property) {
+  notifyStateChanged(property, changed) {
     super.notifyPropertyChanged(property);
-    if('on' == property.name) {
+    if(('on' == property.name) && changed) {
        this.adapter.sendProperties(this.id,
                                    { code : (property.value == false) ? offCodes[this.config.zone] : onCodes[this.config.zone],
                                      param : 0x00,
@@ -237,7 +187,13 @@ class miLightDevice extends Device {
     switch (property.name) {
       case 'color':
         cmd = Object.assign(cmd, cssToCmd(this.properties.get('color').value, zone));
-        this.adapter.sendProperties(this.id, cmd);
+        if((cmd.code == 0x40) && (zone != 0)){
+            this.properties.get('on').setValue(true);
+            sleep(100).then(() => { this.adapter.sendProperties(this.id, cmd) });
+        }
+        else{//white code, no need to send on cmd to identify zone
+            this.adapter.sendProperties(this.id, cmd);
+        }
         break;
       case 'level':
         if (0 == property.value) {
