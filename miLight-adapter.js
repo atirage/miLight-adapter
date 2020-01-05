@@ -206,7 +206,8 @@ class miLightDevice extends Device {
                sleep(100).then(() => { this.adapter.sendProperties(this.id, cmd) });
            }
            else{
-               this.adapter.sendProperties(this.id, cmd)
+            this.properties.get('on').setValue(true);
+            sleep(80).then(() => { this.adapter.sendProperties(this.id, cmd) });
            }
         }
         break;
