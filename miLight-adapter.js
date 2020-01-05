@@ -8,21 +8,15 @@
 
 'use strict';
 
-let Adapter, Device, Property, Database;
-try {
-  Adapter = require('../adapter');
-  Device = require('../device');
-  Property = require('../property');
-} catch (e) {
-  if (e.code !== 'MODULE_NOT_FOUND') {
-    throw e;
-  }
-  const gwa = require('gateway-addon');
-  Adapter = gwa.Adapter;
-  Database = gwa.Database;
-  Device = gwa.Device;
-  Property = gwa.Property;
-}
+const {
+  Adapter,
+  Device,
+  Property,
+  Database,
+} = require('gateway-addon');
+const Color = require('color');
+const dgram = require('dgram');
+const manifest = require('./manifest.json');
 
 function levelToCmd(level, zone) {
   if (level > 0) {
@@ -37,7 +31,6 @@ function levelToCmd(level, zone) {
 }
 
 function cssToCmd(cssColor, zone) {
-  var Color = require('color');
   var hh;
   var hsl;
   const color = Color(cssColor);
@@ -109,7 +102,6 @@ function sleep(ms){
 
 
 const dimmableColorLight = {
-  type: 'dimmableColorLight',
   '@context': 'https://iot.mozilla.org/schemas',
   '@type': ['OnOffSwitch', 'Light', 'ColorControl'],
   name: 'Dimmable Color Light',
@@ -160,7 +152,6 @@ class miLightDevice extends Device {
   constructor(adapter, id, template, config) {
     super(adapter, id);
     this.name = template.name;
-    this.type = template.type;
     this.config = config;
     this['@context'] = template['@context'];
     this['@type'] = template['@type'];
@@ -219,12 +210,12 @@ class miLightDevice extends Device {
 }
 
 class miLightAdapter extends Adapter {
-  constructor(adapterManager, manifest) {
-    super(adapterManager, 'miLightAdapter', manifest.name);
-    adapterManager.addAdapter(this);
+  constructor(addonManager, config) {
+    super(addonManager, manifest.id, manifest.id);
+    addonManager.addAdapter(this);
     var i = 0;
-    for (; i < manifest.moziot.config.bulbs.length; i++) {
-      this.addDevice('miLight-adapter-' + i.toString(), dimmableColorLight, manifest.moziot.config.bulbs[i]);
+    for (; i < config.bulbs.length; i++) {
+      this.addDevice('miLight-adapter-' + i.toString(), dimmableColorLight, config.bulbs[i]);
     }
   }
 
@@ -316,7 +307,6 @@ class miLightAdapter extends Adapter {
   }
 
   sendProperties(deviceId, cmd) {
-    const dgram = require('dgram');
     const message = Buffer.from([cmd.code, cmd.param, 0x55]);
     const client = dgram.createSocket('udp4');
 
@@ -330,33 +320,14 @@ class miLightAdapter extends Adapter {
   }
 }
 
-function loadmiLightAdapter(addonManager, manifest, _errorCallback) {
-  let promise;
-  if (Database) {
-    const db = new Database(manifest.name);
-    promise = db.open().then(() => {
-      return db.loadConfig();
-    }).then((config) => {
-      let bulbsCfg = Object.assign({}, config.bulbs);
-      const bulbs = [];
-      for (const elem in bulbsCfg) {
-        const bulb = Object.assign({}, bulbsCfg[elem]);
-        bulbs.push(bulb);
-      }
-      if (bulbs.length > 0) {
-        manifest.moziot.config.bulbs = bulbs;
-        //console.log('miLightAdapter:', 'Saving config');
-        return db.saveConfig({bulbs});
-      }
-    });
-  }
-  else {
-    promise = Promise.resolve();
-  }
-  promise.then(() => {
-                      console.log('miLightAdapter:', manifest.moziot.config.bulbs);
-                      new miLightAdapter(addonManager, manifest)
-                     });
+function loadmiLightAdapter(addonManager) {
+  const db = new Database(manifest.id);
+  db.open().then(() => {
+    return db.loadConfig();
+  }).then((config) => {
+    console.log('miLightAdapter:', config.bulbs);
+    new miLightAdapter(addonManager, config);
+  });
 }
 
 module.exports = loadmiLightAdapter;
