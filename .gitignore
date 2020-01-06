@@ -1,1 +1,4 @@
+*.tgz
 /.project
+/node_modules/
+SHA256SUMS
