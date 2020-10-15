@@ -1,6 +1,6 @@
 {
   "author": "atirage",
-  "description": "miLight adapter add-on for Mozilla IoT Gateway",
+  "description": "miLight adapter add-on for WebThings Gateway",
   "gateway_specific_settings": {
     "webthings": {
       "exec": "{nodeLoader} {path}",

@@ -1,6 +1,6 @@
 # miLight-adapter
 
-This is a Mozilla WebThings Gateway adapter for the miLight WiFi controller and LED bulbs, also called Easybulb, Limitless, etc.
+This is a WebThings Gateway adapter for the miLight WiFi controller and LED bulbs, also called Easybulb, Limitless, etc.
 
 ## Usage
 

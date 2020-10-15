@@ -2,15 +2,13 @@
   "name": "miLight-adapter",
   "display_name": "miLight",
   "version": "0.0.5",
-  "description": "miLight adapter add-on for Mozilla IoT Gateway",
+  "description": "miLight adapter add-on for WebThings Gateway",
   "author": "atirage",
   "main": "index.js",
   "scripts": {
     "lint": "eslint ."
   },
   "keywords": [
-    "mozilla",
-    "iot",
     "adapter",
     "miLight"
   ],
