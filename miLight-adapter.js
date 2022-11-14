@@ -14,6 +14,7 @@ const {
   Property,
   Database,
 } = require('gateway-addon');
+
 const Color = require('color');
 const dgram = require('dgram');
 const manifest = require('./manifest.json');
@@ -94,6 +95,21 @@ function brightness() {
   };
 }
 
+function color_temp() {
+  return {
+    name: 'temperature',
+    value: 2700,
+    metadata: {
+      title: 'Temperature',
+      type: 'integer',
+      minimum: 2700,
+      maximum: 6500,
+      '@type': 'ColorTemperatureProperty',
+      unit: 'kelvin',
+    },
+  };
+}
+
 function sleep(ms){
   return new Promise(resolve => {
       setTimeout(resolve,ms)
@@ -108,6 +124,7 @@ const dimmableColorLight = {
   properties: [
     color(),
     brightness(),
+    color_temp(),
     on(),
   ],
   actions: [],
@@ -135,15 +152,13 @@ class miLightProperty extends Property {
    */
   setValue(value) {
     return new Promise((resolve) => {
-      const changed = (this.value !== value);
+      const oldValue = this.value();
       this.setCachedValue(value);
+      const hasChanged = oldValue !== this.value;
+      if (hasChanged) {
+        this.device.notifyPropertyChanged(this, oldValue);
+      }
       resolve(this.value);
-      if(this.name == 'on') {
-        this.device.notifyStateChanged(this, 1/*changed*/);
-      }
-      else {
-        this.device.notifyLvlColChanged(this);
-      }
     });
   }
 }
@@ -161,47 +176,65 @@ class miLightDevice extends Device {
     }
   }
 
-  notifyStateChanged(property, changed) {
-    super.notifyPropertyChanged(property);
-    if(('on' == property.name) && changed) {
-       this.adapter.sendProperties(this.id,
-                                   { code : (property.value == false) ? offCodes[this.config.zone] : onCodes[this.config.zone],
-                                     param : 0x00,
-       });
-    }
-  }
-
-  notifyLvlColChanged(property) {
+  async notifyPropertyChanged(property, oldValue) {
     super.notifyPropertyChanged(property);
     let cmd = {};
     let zone = this.config.zone;
+
     switch (property.name) {
+      case 'on':
+        this.adapter.sendProperties(this.id,
+                                    { code : (property.value == false) ? offCodes[this.config.zone] : onCodes[this.config.zone],
+                                      param : 0x00,
+                                    });
+        break;
+
       case 'color':
         cmd = Object.assign(cmd, cssToCmd(this.properties.get('color').value, zone));
         if((cmd.code == 0x40) && (zone != 0)){
-            this.properties.get('on').setValue(true);
-            sleep(100).then(() => { this.adapter.sendProperties(this.id, cmd) });
+          await this.properties.get('on').setValue(true);
+          sleep(100).then(() => { this.adapter.sendProperties(this.id, cmd) });
         }
         else{//white code, no need to send on cmd to identify zone
-            this.adapter.sendProperties(this.id, cmd);
+          this.adapter.sendProperties(this.id, cmd);
         }
         break;
+
       case 'level':
         if (0 == property.value) {
-            this.properties.get('on').setValue(false);
+          this.properties.get('on').setValue(false);
         }
         else {
-           cmd = Object.assign(cmd, levelToCmd(this.properties.get('level').value, zone));
-           if (this.properties.get('on').value == false) {
-               this.properties.get('on').setValue(true);
-               sleep(100).then(() => { this.adapter.sendProperties(this.id, cmd) });
-           }
-           else{
-            this.properties.get('on').setValue(true);
-            sleep(80).then(() => { this.adapter.sendProperties(this.id, cmd) });
-           }
+          let t = 100;
+          cmd = Object.assign(cmd, levelToCmd(this.properties.get('level').value, zone));
+          if (this.properties.get('on').value !== false) {
+            t = 80; 
+          }
+          await this.properties.get('on').setValue(true);
+          sleep(t).then(() => { this.adapter.sendProperties(this.id, cmd) });
         }
         break;
+
+      case 'temperature':
+        let t = 100;
+        if (oldValue < property.value) {
+          cmd = {code: 0x3E, param : 0x00};
+        }
+        else{
+          cmd = {code: 0x3F, param : 0x00};
+        }
+        let k = Math.round(Math.abs(oldValue - property.value));
+        /*if (this.properties.get('on').value !== false) {
+          t = 80;
+        }*/
+        //now we need to run the command k times, but first activate zone
+        await this.properties.get('on').setValue(true);
+        for (let i = 0; i < k; i++) {
+          await sleep(t);
+          this.adapter.sendProperties(this.id, cmd);
+        }
+        break;
+
       default:
         console.warn('Unknown property:', property.name);
         break;
@@ -213,8 +246,7 @@ class miLightAdapter extends Adapter {
   constructor(addonManager, config) {
     super(addonManager, manifest.id, manifest.id);
     addonManager.addAdapter(this);
-    var i = 0;
-    for (; i < config.bulbs.length; i++) {
+    for (let i = 0; i < config.bulbs.length; i++) {
       this.addDevice('miLight-adapter-' + i.toString(), dimmableColorLight, config.bulbs[i]);
     }
   }
