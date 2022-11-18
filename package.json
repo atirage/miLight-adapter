@@ -1,7 +1,7 @@
 {
   "name": "miLight-adapter",
   "display_name": "miLight",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "miLight adapter add-on for WebThings Gateway",
   "author": "atirage",
   "main": "index.js",

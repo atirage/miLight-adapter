@@ -152,9 +152,9 @@ class miLightProperty extends Property {
    */
   setValue(value) {
     return new Promise((resolve) => {
-      const oldValue = this.value();
+      const oldValue = this.value;
       this.setCachedValue(value);
-      const hasChanged = oldValue !== this.value;
+      const hasChanged = (oldValue !== this.value);
       if (hasChanged) {
         this.device.notifyPropertyChanged(this, oldValue);
       }
@@ -218,12 +218,12 @@ class miLightDevice extends Device {
       case 'temperature':
         let t = 100;
         if (oldValue < property.value) {
-          cmd = {code: 0x3E, param : 0x00};
+          cmd = {code: 0x44, param : 0x00};
         }
         else{
-          cmd = {code: 0x3F, param : 0x00};
+          cmd = {code: 0x43, param : 0x00};
         }
-        let k = Math.round(Math.abs(oldValue - property.value));
+        let k = Math.round(Math.abs(oldValue - property.value) / 380);
         /*if (this.properties.get('on').value !== false) {
           t = 80;
         }*/
@@ -346,7 +346,7 @@ class miLightAdapter extends Adapter {
     if (this.devices[deviceId]) {
       this.devices[deviceId].recentlyUpdated = true;
     }
-    client.send(message, this.devices[deviceId].config.bridgePort, this.devices[deviceId].config.bridgeIP, (err) => {
+    client.send(message, this.devices[deviceId].config.bridgePort, this.devices[deviceId].config.bridgeIP, (err, bytes) => {
       client.close();
     });
   }
